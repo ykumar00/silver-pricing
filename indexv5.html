@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>QR Price Parser Pro</title>
+    <link rel="icon" type="image/png" href="favicon.png">
+    <link rel="apple-touch-icon" href="icon.png">
+    <style>
+        :root {
+            --primary: #2c3e50;
+            --accent: #3498db;
+            --success: #27ae60;
+            --danger: #e74c3c;
+            --bg: #f4f7f6;
+            --card-bg: #ffffff;
+        }
+
+        body {
+            font-family: -apple-system, system-ui, sans-serif;
+            background-color: var(--bg);
+            margin: 0;
+            color: var(--primary);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        header {
+            width: 100%;
+            background: white;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            text-align: center;
+            padding: 12px 0;
+        }
+
+        header img { max-height: 45px; vertical-align: middle; }
+
+        .container {
+            width: 92%;
+            max-width: 450px;
+            padding: 20px 0;
+            box-sizing: border-box;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            margin-bottom: 20px;
+            box-sizing: border-box;
+        }
+
+        label {
+            display: block;
+            font-size: 0.75rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+            color: #95a5a6;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .input-group {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 10px;
+            align-items: center;
+        }
+
+        input {
+            width: 100%;
+            padding: 12px;
+            border: 1.5px solid #dfe6e9;
+            border-radius: 8px;
+            font-size: 1rem;
+            outline: none;
+            box-sizing: border-box;
+            background: #fff;
+        }
+
+        input:focus { border-color: var(--accent); }
+
+        button {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            background: var(--accent);
+            color: white;
+            font-weight: 700;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        #btn-save { background: var(--success); }
+
+        #scanner-modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.95);
+            z-index: 1000;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #video-preview {
+            width: 85%;
+            max-width: 400px;
+            border-radius: 15px;
+            border: 2px solid white;
+            background: #000;
+        }
+
+        .modal-close { margin-top: 25px; background: var(--danger); }
+
+        #toast {
+            visibility: hidden;
+            min-width: 250px;
+            background-color: #333;
+            color: #fff;
+            text-align: center;
+            border-radius: 8px;
+            padding: 16px;
+            position: fixed;
+            z-index: 1001;
+            left: 50%;
+            bottom: 30px;
+            transform: translateX(-50%);
+            font-weight: 600;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+
+        #toast.show { visibility: visible; animation: fadein 0.5s, fadeout 0.5s 2.5s; }
+        #toast.error { background-color: var(--danger); }
+
+        @keyframes fadein { from {bottom: 0; opacity: 0;} to {bottom: 30px; opacity: 1;} }
+        @keyframes fadeout { from {bottom: 30px; opacity: 1;} to {bottom: 0; opacity: 0;} }
+
+        #results { display: none; animation: fadeIn 0.4s ease; border-left: 5px solid var(--success); }
+        .result-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 10px; }
+        .result-item { border-bottom: 1px solid #f1f2f6; padding: 6px 0; }
+        .result-item span { display: block; font-size: 1.1rem; font-weight: 600; }
+        .mrp-box { grid-column: span 2; background: #f8f9fa; padding: 15px; border-radius: 10px; text-align: center; border: 2px solid var(--success); margin-top: 10px; }
+        .mrp-value { font-size: 2.2rem; color: var(--success); font-weight: 900; }
+
+        footer { margin-top: auto; padding: 20px; font-size: 0.7rem; color: #bdc3c7; text-align: center; width: 100%; }
+    </style>
+</head>
+<body>
+
+<header><img src="header.png" alt="Logo"></header>
+
+<div class="container">
+    <div class="card">
+        <label>Silver Rate / Gram</label>
+        <div class="input-group">
+            <input type="number" id="silver-rate" placeholder="0.00" step="0.01">
+            <button id="btn-save" onclick="saveRate()">SAVE</button>
+        </div>
+    </div>
+
+    <div class="card">
+        <label>String Input</label>
+        <div class="input-group">
+            <input type="text" id="qr-input" placeholder="Scan or Type..." 
+                   readonly inputmode="none"
+                   onclick="enableKeyboard(this)" 
+                   onblur="disableKeyboard(this)">
+            <button onclick="openScanner()">📷 SCAN</button>
+        </div>
+    </div>
+
+    <div id="results" class="card">
+        <label>Calculation Result</label>
+        <div class="result-grid">
+            <div class="result-item"><label>Type</label><span id="res-type">-</span></div>
+            <div class="result-item"><label>Weight</label><span id="res-weight">-</span></div>
+            <div class="result-item"><label>MC</label><span id="res-mc">-</span></div>
+            <div class="result-item"><label>Tag #</label><span id="res-tag">-</span></div>
+            <div class="result-item" style="grid-column: span 2;">
+                <label>Costing Code</label><span id="res-code">-</span>
+            </div>
+            <div class="mrp-box">
+                <label>Calculated MRP</label>
+                <div class="mrp-value" id="res-mrp">₹0</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="scanner-modal">
+    <h3 style="color: white; margin-bottom: 15px;">Focus on QR Code</h3>
+    <video id="video-preview" autoplay playsinline></video>
+    <button class="modal-close" onclick="closeScanner()">CANCEL</button>
+</div>
+
+<div id="toast">Message</div>
+
+<footer ondblclick="changeMultiplier()">
+    Multiplier: <span id="display-multiplier"></span>
+</footer>
+
+<script>
+    const DEFAULTS = { multiplier: 2.1 };
+    let currentMultiplier = parseFloat(localStorage.getItem('multiplier')) || DEFAULTS.multiplier;
+    let scanActive = false;
+    let videoStream = null;
+    let isProcessing = false;
+
+    window.onload = () => {
+        const savedRate = localStorage.getItem('silver_rate');
+        if (savedRate) document.getElementById('silver-rate').value = savedRate;
+        document.getElementById('display-multiplier').innerText = currentMultiplier.toFixed(2);
+        
+        document.getElementById('qr-input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') validateAndParse(e.target.value);
+        });
+    };
+
+    // Keyboard Management
+    function enableKeyboard(el) {
+        el.readOnly = false;
+        el.inputMode = "text";
+        el.focus();
+    }
+
+    function disableKeyboard(el) {
+        el.readOnly = true;
+        el.inputMode = "none";
+    }
+
+    function showToast(msg, isError = false) {
+        const t = document.getElementById("toast");
+        t.innerText = msg;
+        t.className = "show" + (isError ? " error" : "");
+        setTimeout(() => { t.className = t.className.replace("show", ""); }, 3000);
+    }
+
+    function saveRate() {
+        const val = document.getElementById('silver-rate').value;
+        if (!val || val <= 0) { showToast("Enter a valid rate", true); return; }
+        localStorage.setItem('silver_rate', val);
+        showToast("Rate Saved!");
+    }
+
+    function changeMultiplier() {
+        const val = prompt("Enter new Multiplier:", currentMultiplier);
+        if (val && !isNaN(val)) {
+            currentMultiplier = parseFloat(val);
+            localStorage.setItem('multiplier', currentMultiplier);
+            document.getElementById('display-multiplier').innerText = currentMultiplier.toFixed(2);
+        }
+    }
+
+    function beep(success = true) {
+        try {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = ctx.createOscillator();
+            const g = ctx.createGain();
+            osc.connect(g); g.connect(ctx.destination);
+            osc.frequency.setValueAtTime(success ? 800 : 200, ctx.currentTime);
+            g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.5);
+            osc.start(); osc.stop(ctx.currentTime + 0.5);
+            if (navigator.vibrate) navigator.vibrate(success ? 200 : [100, 50, 100]);
+        } catch(e) {}
+    }
+
+    function validateAndParse(str) {
+        const inputField = document.getElementById('qr-input');
+        const currentRate = parseFloat(document.getElementById('silver-rate').value);
+        
+        if (!currentRate || currentRate <= 0) {
+            showToast("Set Silver Rate first!", true);
+            return false;
+        }
+
+        const p = str.split(',').map(item => item.trim());
+        if (p.length !== 6) {
+            showToast("Invalid Format", true);
+            beep(false);
+            return false;
+        }
+
+        executeParse(p, currentRate);
+        
+        // Post-Parse Cleanup
+        inputField.value = "";
+        inputField.blur(); // Hide keyboard if it was visible
+        disableKeyboard(inputField); // Reset to stealth mode
+        
+        return true;
+    }
+
+    function executeParse(p, currentRate) {
+        const weight = parseFloat(p[0]), histRate = parseFloat(p[1]), mc = parseFloat(p[2]), tag = p[5];
+        const types = {'R':'Ring', 'C':'Chain', 'T':'Tops', 'K':'Kada'};
+        
+        document.getElementById('res-type').innerText = types[tag.charAt(0).toUpperCase()] || 'Other';
+        const totalCost = (weight * (histRate + mc)).toFixed(0);
+        const mrp = (weight * (currentRate + mc) * currentMultiplier).toFixed(0);
+
+        document.getElementById('res-weight').innerText = weight.toFixed(3) + 'g';
+        document.getElementById('res-mc').innerText = '₹' + mc;
+        document.getElementById('res-tag').innerText = tag;
+        document.getElementById('res-code').innerText = `${histRate}P${mc}T${totalCost}`;
+        document.getElementById('res-mrp').innerText = '₹' + parseInt(mrp).toLocaleString('en-IN');
+        
+        const resultsCard = document.getElementById('results');
+        resultsCard.style.display = 'block';
+        resultsCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        beep(true);
+    }
+
+    async function openScanner() {
+        if (!document.getElementById('silver-rate').value) { showToast("Enter Rate First", true); return; }
+        if (!('BarcodeDetector' in window)) { showToast("API Not Supported", true); return; }
+
+        const modal = document.getElementById('scanner-modal');
+        const video = document.getElementById('video-preview');
+        modal.style.display = 'flex';
+        scanActive = true;
+        isProcessing = false;
+
+        try {
+            videoStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+            video.srcObject = videoStream;
+            const detector = new BarcodeDetector({ formats: ['qr_code'] });
+
+            const detectLoop = async () => {
+                if (!scanActive || isProcessing) return;
+                try {
+                    const barcodes = await detector.detect(video);
+                    if (barcodes.length > 0) {
+                        isProcessing = true;
+                        const val = barcodes[0].rawValue;
+                        if (validateAndParse(val)) {
+                            closeScanner();
+                        } else {
+                            document.getElementById('qr-input').value = "";
+                            setTimeout(() => { isProcessing = false; detectLoop(); }, 2000);
+                        }
+                    } else { requestAnimationFrame(detectLoop); }
+                } catch (e) { requestAnimationFrame(detectLoop); }
+            };
+            detectLoop();
+        } catch (err) { showToast("Camera Access Denied", true); closeScanner(); }
+    }
+
+    function closeScanner() {
+        scanActive = false;
+        if (videoStream) videoStream.getTracks().forEach(t => t.stop());
+        document.getElementById('scanner-modal').style.display = 'none';
+        // Refocus quietly without triggering keyboard
+        const qrField = document.getElementById('qr-input');
+        disableKeyboard(qrField);
+        setTimeout(() => qrField.focus({ preventScroll: true }), 100);
+    }
+</script>
+</body>
+</html>
