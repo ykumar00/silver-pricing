@@ -316,39 +316,65 @@
     }
 
     async function openScanner() {
-        if (!document.getElementById('silver-rate').value) { showToast("Enter Rate First", true); return; }
-        if (!('BarcodeDetector' in window)) { showToast("API Not Supported", true); return; }
-
-        const modal = document.getElementById('scanner-modal');
-        const video = document.getElementById('video-preview');
-        modal.style.display = 'flex';
-        scanActive = true;
-        isProcessing = false;
-
-        try {
-            videoStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
-            video.srcObject = videoStream;
-            const detector = new BarcodeDetector({ formats: ['qr_code'] });
-
-            const detectLoop = async () => {
-                if (!scanActive || isProcessing) return;
-                try {
-                    const barcodes = await detector.detect(video);
-                    if (barcodes.length > 0) {
-                        isProcessing = true;
-                        const val = barcodes[0].rawValue;
-                        if (validateAndParse(val)) {
-                            closeScanner();
-                        } else {
-                            document.getElementById('qr-input').value = "";
-                            setTimeout(() => { isProcessing = false; detectLoop(); }, 2000);
-                        }
-                    } else { requestAnimationFrame(detectLoop); }
-                } catch (e) { requestAnimationFrame(detectLoop); }
-            };
-            detectLoop();
-        } catch (err) { showToast("Camera Access Denied", true); closeScanner(); }
+    if (!document.getElementById('silver-rate').value) { showToast("Enter Rate First", true); return; }
+    
+    // Check for BarcodeDetector support
+    if (!('BarcodeDetector' in window)) { 
+        showToast("Native Scanning not supported", true); 
+        return; 
     }
+
+    const modal = document.getElementById('scanner-modal');
+    const video = document.getElementById('video-preview');
+    modal.style.display = 'flex';
+    scanActive = true;
+    isProcessing = false;
+
+    try {
+        // Request high resolution for small Data Matrix codes
+        videoStream = await navigator.mediaDevices.getUserMedia({ 
+            video: { 
+                facingMode: "environment",
+                width: { ideal: 1280 },
+                height: { ideal: 720 }
+            } 
+        });
+        
+        video.srcObject = videoStream;
+
+        // Initialize detector for BOTH QR and Data Matrix
+        const detector = new BarcodeDetector({ 
+            formats: ['qr_code', 'data_matrix'] 
+        });
+
+        const detectLoop = async () => {
+            if (!scanActive || isProcessing) return;
+            try {
+                const barcodes = await detector.detect(video);
+                if (barcodes.length > 0) {
+                    isProcessing = true;
+                    const val = barcodes[0].rawValue;
+                    
+                    // Log the type detected for debugging (optional)
+                    console.log("Detected Format:", barcodes[0].format);
+
+                    document.getElementById('qr-input').value = val;
+                    
+                    if (validateAndParse(val)) {
+                        closeScanner();
+                    } else {
+                        document.getElementById('qr-input').value = "";
+                        setTimeout(() => { isProcessing = false; detectLoop(); }, 2000);
+                    }
+                } else { requestAnimationFrame(detectLoop); }
+            } catch (e) { requestAnimationFrame(detectLoop); }
+        };
+        detectLoop();
+    } catch (err) { 
+        showToast("Camera Access Denied", true); 
+        closeScanner(); 
+    }
+}
 
     function closeScanner() {
         scanActive = false;
