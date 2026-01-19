@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>QR Price Parser Pro</title>
+    <title>Moksha Jewels - Product Lookup</title>
     <link rel="icon" type="image/png" href="favicon.png">
     <link rel="apple-touch-icon" href="icon.png">
     <style>
         :root {
             --primary: #2c3e50;
             --accent: #3498db;
-            --success: #27ae60;
+            --success: #2ab8a0;
             --danger: #e74c3c;
             --bg: #f4f7f6;
             --card-bg: #ffffff;
@@ -47,9 +47,9 @@
         .card {
             background: var(--card-bg);
             border-radius: 12px;
-            padding: 20px;
+            padding: 10px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-            margin-bottom: 20px;
+            margin-bottom: 15px;
             box-sizing: border-box;
         }
 
@@ -164,7 +164,7 @@
     </div>
 
     <div class="card">
-        <label>String Input</label>
+        <label>Scan Barcode</label>
         <div class="input-group">
             <input type="text" id="qr-input" placeholder="Scan or Type..." 
                    readonly inputmode="none"
@@ -175,17 +175,20 @@
     </div>
 
     <div id="results" class="card">
-        <label>Calculation Result</label>
+        <label>Item Info:</label>
         <div class="result-grid">
             <div class="result-item"><label>Type</label><span id="res-type">-</span></div>
-            <div class="result-item"><label>Weight</label><span id="res-weight">-</span></div>
-            <div class="result-item"><label>MC</label><span id="res-mc">-</span></div>
             <div class="result-item"><label>Tag #</label><span id="res-tag">-</span></div>
+            <div class="result-item"><label>Weight</label><span id="res-weight">-</span></div>
+            
+            
+            <div class="result-item"><label>MC</label><span id="res-mc">-</span></div>
+            
             <div class="result-item" style="grid-column: span 2;">
-                <label>Costing Code</label><span id="res-code">-</span>
+                <label>Stock Code</label><span id="res-code">-</span>
             </div>
             <div class="mrp-box">
-                <label>Calculated MRP</label>
+                <label>MRP</label>
                 <div class="mrp-value" id="res-mrp">₹0</div>
             </div>
         </div>
@@ -205,7 +208,11 @@
 </footer>
 
 <script>
-    const DEFAULTS = { multiplier: 2.1 };
+//===================================================== SET BOTH MULTIPLIERS HERE ===========================================================================================
+
+    const DEFAULTS = { multiplier: 2.1 , mc_multiplier: 4.5};
+
+
     let currentMultiplier = parseFloat(localStorage.getItem('multiplier')) || DEFAULTS.multiplier;
     let scanActive = false;
     let videoStream = null;
@@ -214,7 +221,7 @@
     window.onload = () => {
         const savedRate = localStorage.getItem('silver_rate');
         if (savedRate) document.getElementById('silver-rate').value = savedRate;
-        document.getElementById('display-multiplier').innerText = currentMultiplier.toFixed(2);
+        document.getElementById('display-multiplier').innerText = "MRP: "+ currentMultiplier.toFixed(2) + " | MC: " + DEFAULTS.mc_multiplier + "x";
         
         document.getElementById('qr-input').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') validateAndParse(e.target.value);
@@ -297,14 +304,33 @@
 
     function executeParse(p, currentRate) {
         const weight = parseFloat(p[0]), histRate = parseFloat(p[1]), mc = parseFloat(p[2]), tag = p[5];
+
+        const mcType = p[3]
+        const tagType = p[4]
+
         const types = {'R':'Ring', 'C':'Chain', 'T':'Tops', 'K':'Kada'};
         
         document.getElementById('res-type').innerText = types[tag.charAt(0).toUpperCase()] || 'Other';
         const totalCost = (weight * (histRate + mc)).toFixed(0);
-        const mrp = (weight * (currentRate + mc) * currentMultiplier).toFixed(0);
+        
+        let mrp = 0;
+        
+    
+        if (tagType == 'mrp') {
+        console.log("MRP TAG");
+        mrp = (weight * (currentRate + mc) * currentMultiplier).toFixed(0);
+        document.getElementById('res-mc').innerText = '-';
+        } 
 
+
+        else {
+        console.log("MC PER GM TAG");
+        const sellingMC = Math.ceil(mc * DEFAULTS.mc_multiplier);
+        mrp = (weight * (currentRate + (sellingMC))).toFixed(0);
+        document.getElementById('res-mc').innerText = '₹' + sellingMC;
+    } 
+        
         document.getElementById('res-weight').innerText = weight.toFixed(3) + 'g';
-        document.getElementById('res-mc').innerText = '₹' + mc;
         document.getElementById('res-tag').innerText = tag;
         document.getElementById('res-code').innerText = `${histRate}P${mc}T${totalCost}`;
         document.getElementById('res-mrp').innerText = '₹' + parseInt(mrp).toLocaleString('en-IN');
