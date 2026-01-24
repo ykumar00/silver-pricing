@@ -333,7 +333,7 @@
         document.getElementById('res-weight').innerText = weight.toFixed(3) + 'g';
         document.getElementById('res-tag').innerText = tag;
         document.getElementById('res-code').innerText = `${histRate}P${mc}T${totalCost}`;
-        document.getElementById('res-mrp').innerText = '₹' + parseInt(mrp).toLocaleString('en-IN');
+        document.getElementById('res-mrp').innerText = '₹' + parseInt(mrp).toLocaleString('en-IN') + '/-';
         
         const resultsCard = document.getElementById('results');
         resultsCard.style.display = 'block';
@@ -413,4 +413,5 @@
     }
 </script>
 </body>
+
 </html>
